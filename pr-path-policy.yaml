@@ -1,0 +1,18 @@
+# Path rules for pull requests. Edited by maintainers only.
+version: 1
+
+# When a PR has this label, every changed file must match content_only.allow
+# and must not match content_only.deny.
+content_only:
+  label: content-only
+  allow:
+    - "**/*.md"
+    - "frontend/static/**"
+  deny:
+    - "backend/**"
+    - "scripts/**"
+    - ".github/**"
+
+# Applied to every PR when non-empty: changed files must not match these patterns.
+global:
+  deny: []
