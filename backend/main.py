@@ -1,11 +1,15 @@
+import shutil
 import sqlite3
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+import uuid
+from pathlib import Path
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import uuid
-import asyncio
+
 from backend.analyzer.classifier import Classifier
 from backend.analyzer.config_generator import ConfigGenerator
+from backend.analyzer.git_remote import clone_github_shallow, looks_like_github_clone_target
 from backend.db.cache import AnalysisCache
 
 app = FastAPI()
@@ -21,15 +25,23 @@ app.add_middleware(
 cache = AnalysisCache()
 
 async def run_analysis_task(analysis_id: str, repo_url: str):
+    raw = repo_url.strip()
+    temp_clone: Path | None = None
+    analysis_path = raw
+
     try:
         cache.update_status(analysis_id, "in_progress")
 
-        # In a real implementation, we'd handle cloning from URL.
-        # For now, we assume repo_url is a local path or we handle it.
-        classifier = Classifier(repo_url)
+        if looks_like_github_clone_target(raw):
+            clone_root, temp_clone = clone_github_shallow(raw)
+            analysis_path = str(clone_root)
+        else:
+            analysis_path = str(Path(raw).resolve())
+
+        classifier = Classifier(analysis_path)
         results = await classifier.classify_all()
 
-        generator = ConfigGenerator(repo_url)
+        generator = ConfigGenerator(raw)
         for res in results:
             generator.add_file_result(
                 path=res["path"],
@@ -41,10 +53,13 @@ async def run_analysis_task(analysis_id: str, repo_url: str):
             )
 
         analysis_data = generator.generate()
-        cache.save_analysis(analysis_id, repo_url, analysis_data, "completed")
+        cache.save_analysis(analysis_id, raw, analysis_data, "completed")
     except Exception as e:
         print(f"Error in analysis task: {e}")
         cache.update_status(analysis_id, "failed")
+    finally:
+        if temp_clone is not None and temp_clone.exists():
+            shutil.rmtree(temp_clone, ignore_errors=True)
 
 class AnalyzeRequest(BaseModel):
     repo_url: str

@@ -136,7 +136,7 @@
           <input
             type="text"
             bind:value={repoUrl}
-            placeholder="Enter repo URL or local path (e.g., ./test_repo)"
+            placeholder="GitHub URL (https://github.com/...) or local path on the server"
             disabled={status === 'analyzing'}
             onkeydown={(e) => e.key === 'Enter' && handleStartAnalysis()}
           />
