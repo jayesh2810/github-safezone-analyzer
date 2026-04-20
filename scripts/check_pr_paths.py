@@ -81,10 +81,7 @@ def main() -> None:
     labels = _parse_labels(os.environ.get("PR_LABELS", ""))
     content_only_mode = bool(co_label and co_label in labels)
 
-    try:
-        files = _changed_files(base, head)
-    except SystemExit:
-        raise
+    files = _changed_files(base, head)
 
     violations: list[str] = []
 
@@ -95,18 +92,18 @@ def main() -> None:
     for path in files:
         norm = path.replace("\\", "/")
 
-        if global_deny_spec.patterns and _matches_any(global_deny_spec, norm):
+        if global_deny and _matches_any(global_deny_spec, norm):
             violations.append(f"[global.deny] {norm}")
             continue
 
         if not content_only_mode:
             continue
 
-        if co_deny_spec.patterns and _matches_any(co_deny_spec, norm):
+        if co_deny and _matches_any(co_deny_spec, norm):
             violations.append(f"[content_only.deny] {norm}")
             continue
 
-        if not allow_spec.patterns:
+        if not co_allow:
             violations.append(f"[content_only.allow] (no allow rules) {norm}")
             continue
 
