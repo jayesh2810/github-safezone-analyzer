@@ -47,7 +47,7 @@ class RepoAnalyzer:
                     size = file_path.stat().st_size
                     content = None
                     # Load content lazily for small files
-                    if size < 50 * 1024: # 50KB
+                    if size < 256 * 1024:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             content = f.read()
 

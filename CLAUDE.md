@@ -38,7 +38,8 @@ PYTHONPATH=. pytest
 backend/
   analyzer/
     repo.py           — Git clone + file discovery (RepoAnalyzer class)
-    heuristics.py     — Rule-based classification (classify_file function)
+    heuristics.py     — Re-exports content_classifier.classify_by_content as classify_file
+    content_classifier.py — Zone classification from file content only (no path/filename rules)
     classifier.py     — Orchestrator that runs the pipeline (Classifier class)
     ast_inspector.py  — [TODO] tree-sitter / regex content analysis
     llm_analyzer.py   — [TODO] Ollama/Groq for ambiguous files
