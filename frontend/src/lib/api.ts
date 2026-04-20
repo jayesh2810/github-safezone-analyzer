@@ -10,16 +10,16 @@ export async function startAnalysis(repoUrl: string) {
 }
 
 export async function getAnalysis(analysisId: string) {
-    const response = await fetch(`http://localhost:8000/analyze/${analysis_id}`);
+    const response = await fetch(`http://localhost:8000/analyze/${analysisId}`);
     return await response.json();
 }
 
 export async function getAnalysisTree(analysisId: string) {
-    const response = await fetch(`http://localhost:8000/analyze/${analysis_id}/tree`);
+    const response = await fetch(`http://localhost:8000/analyze/${analysisId}/tree`);
     return await response.json();
 }
 
 export async function getHealth() {
-    const response = await fetch('http://localhost:80.00/health');
+    const response = await fetch('http://localhost:8000/health');
     return await response.json();
 }
