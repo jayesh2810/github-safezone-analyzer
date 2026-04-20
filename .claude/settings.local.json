@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p src/analyzer src/classifier src/generator src/cli tests)",
+      "Bash(touch requirements.txt src/__init__.py src/analyzer/__init__.py src/classifier/__init__.py src/generator/__init__.py src/cli/__init__.py tests/__init__.py)",
+      "Bash(pip install *)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx sv *)"
+    ]
+  }
+}
