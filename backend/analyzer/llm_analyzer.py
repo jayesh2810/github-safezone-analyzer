@@ -1,5 +1,4 @@
 import os
-import json
 import httpx
 from backend.models.schemas import FileInfo, Classification
 
@@ -87,6 +86,7 @@ Respond in JSON:
 """
 
     def _parse_llm_response(self, response_text: str) -> Classification | None:
+        import json
         try:
             data = json.loads(response_text)
             return Classification(

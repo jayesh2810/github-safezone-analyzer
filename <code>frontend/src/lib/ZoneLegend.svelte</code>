@@ -1,0 +1,63 @@
+<script>
+  export let summary = { safe: 0, caution: 0, restricted: 0 };
+</script>
+
+<div class="legend">
+  <div class="summary-header">
+    <h3>Zone Summary</h3>
+  </div>
+  <div class="legend-item">
+    <span class="dot safe"></span>
+    <span class="label">Safe</span>
+    <span class="count">{summary.safe}</span>
+  </div>
+  <div class="legend-item">
+    <span class="dot caution"></span>
+    <span class="label">Caution</span>
+    <span class="count">{summary.caution}</span>
+  </div>
+  <div class="legend-item">
+    <span class="dot restricted"></span>
+    <span class="label">Restricted</span>
+    <span class="count">{summary.restricted}</span>
+  </div>
+</div>
+
+<style>
+  .legend {
+    padding: 1rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    width: 200px;
+  }
+  .summary-header h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #111827;
+  }
+  .legend-item {
+    display: flex;
+    align_items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #374151;
+    gap: 0.75rem;
+  }
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.safe { background: #22c55e; }
+  .dot.caution { background: #eab308; }
+  .dot.restricted { background: #ef4444; }
+  .label {
+    flex-grow: 1;
+  }
+  .count {
+    font-weight: 600;
+    color: #6b7280;
+  }
+</style>
