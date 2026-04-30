@@ -1,10 +1,13 @@
 <script lang="ts">
-  import { startAnalysis, getAnalysis, getAnalysisTree } from '$lib/api';
+  import { startAnalysis, getAnalysis, getAnalysisTree, exportRules } from '$lib/api';
   import TreeMap from '$lib/TreeMap.svelte';
+
 
   let repoUrl = $state('');
   let analysisId: string | null = $state(null);
+  let selectedIde = $state('cursor');
   let status: 'idle' | 'analyzing' | 'completed' | 'failed' | 'error' = $state('idle');
+
   let errorMessage = $state('');
   let analysisData: any = $state(null);
   let fileDetails: any[] = $state([]);
@@ -15,7 +18,6 @@
     if (!repoUrl) {
       errorMessage = 'Please enter a repository URL or path.';
       return;
-
     }
 
     status = 'analyzing';
@@ -25,45 +27,31 @@
     selectedFile = null;
 
     try {
-      const response = await startAnalysis(repoUrl);
-      analysisId = response.analysis_id;
-      startPolling(response.analysis_id);
+      const result = await startAnalysis(repoUrl);
+      analysisData = result;
+      status = 'completed';
+      fetchTreeFromResult(result);
     } catch (err) {
       status = 'error';
-      errorMessage = 'Failed to start analysis. Make sure the backend is running.';
+      errorMessage = 'Failed to analyze repository. Make sure the backend is running.';
       console.error(err);
     }
   }
 
+  async function fetchTreeFromResult(result: any) {
+    try {
+      fileDetails = result.file_details || [];
+    } catch (err) {
+      console.error('Error processing tree from result:', err);
+    }
+  }
+
   function startPolling(id: string) {
-    pollingInterval = setInterval(async () => {
-      try {
-        const data = await getAnalysis(id);
-        if (data.status === 'completed') {
-          analysisData = data.data;
-          status = 'completed';
-          stopPolling();
-          fetchTree(id);
-        } else if (data.status === 'failed') {
-          status = 'failed';
-          errorMessage = 'Analysis failed on the server.';
-          stopPolling();
-        }
-      } catch (err) {
-        status = 'error';
-        errorMessage = 'Error polling analysis status.';
-        stopPolling();
-        console.error(err);
-      }
-    }, 3000);
+    // No longer needed as analysis is synchronous
   }
 
   async function fetchTree(id: string) {
-    try {
-      fileDetails = await getAnalysisTree(id);
-    } catch (err) {
-      console.error('Error fetching tree:', err);
-    }
+    // No longer needed as results are returned immediately
   }
 
   function stopPolling() {
@@ -73,7 +61,21 @@
     }
   }
 
+  async function handleExportRules() {
+    if (!repoUrl) return;
+    try {
+      const response = await exportRules(repoUrl, selectedIde);
+      if (response.status === 'success') {
+        alert(`Success! Rules written to: ${response.file_written}`);
+      }
+    } catch (err) {
+      errorMessage = 'Failed to export rules to the repository.';
+      console.error(err);
+    }
+  }
+
   function handleFileSelect(file: any) {
+
     selectedFile = file;
   }
 </script>
@@ -148,7 +150,20 @@
             Analyze
           {/if}
         </button>
+        {#if status === 'completed'}
+          <div class="export-group">
+            <select bind:value={selectedIde} class="ide-select">
+              <option value="cursor">Cursor</option>
+              <option value="windsurf">Windsurf</option>
+              <option value="claude_code">Claude Code</option>
+            </select>
+            <button class="export-btn" onclick={handleExportRules}>
+              Export Rules
+            </button>
+          </div>
+        {/if}
       </div>
+
       {#if errorMessage}
         <div class="error-banner">{errorMessage}</div>
       {/if}
@@ -381,9 +396,10 @@
     50% { opacity: 0.4; transform: scale(1.5); }
   }
 
-  .input-group { display: flex; gap: 0.5rem; }
-  .input-wrapper {
-    flex: 1;
+   .input-group { display: flex; gap: 0.5rem; align-items: center; }
+   .input-wrapper {
+     flex: 1;
+
     display: flex;
     align-items: center;
     background: #0d1117;
@@ -426,9 +442,39 @@
     background: linear-gradient(135deg, #2ea043, #3fb950);
     box-shadow: 0 0 12px rgba(46, 160, 67, 0.3);
   }
-  .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+   .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  .spinner {
+   .export-group { display: flex; gap: 0.5rem; align-items: center; animation: fade-in 0.3s ease; }
+   .ide-select {
+     background: #0d1117;
+     border: 1px solid #30363d;
+     color: #e1e4e8;
+     padding: 0.5rem 0.75rem;
+     border-radius: 0.5rem;
+     font-size: 0.85rem;
+     cursor: pointer;
+     outline: none;
+   }
+   .export-btn {
+     padding: 0.6rem 1.25rem;
+     background: #30363d;
+     color: #fff;
+     border: 1px solid #484f58;
+     border-radius: 0.5rem;
+     font-size: 0.9rem;
+     font-weight: 600;
+     cursor: pointer;
+     transition: all 0.2s;
+     font-family: inherit;
+   }
+   .export-btn:hover {
+     background: #484f58;
+     border-color: #8b949e;
+   }
+   @keyframes fade-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+   .spinner {
+
     width: 14px; height: 14px;
     border: 2px solid rgba(255,255,255,0.3);
     border-top-color: #fff;

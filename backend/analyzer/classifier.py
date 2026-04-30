@@ -1,21 +1,23 @@
 from typing import List, Dict
+from datetime import datetime
 
 from backend.analyzer.repo import RepoAnalyzer
 from backend.analyzer.content_classifier import classify_by_content
 from backend.analyzer.llm_analyzer import LLMAnalyzer
-from backend.models.schemas import Classification
+from backend.models.schemas import Classification, AnalysisResult
 
 class Classifier:
     def __init__(self, repo_path: str):
         self.analyzer = RepoAnalyzer(repo_path)
         self.llm_analyzer = LLMAnalyzer()
 
-    async def classify_all(self) -> List[Dict[str, any]]:
+    async def classify_all(self) -> AnalysisResult:
         """
         Runs content-first classification on all files (no path/filename rules).
         """
         files = self.analyzer.list_files()
-        results = []
+        file_details = []
+        summary = {"safe": 0, "caution": 0, "restricted": 0}
 
         for file in files:
             classification = classify_by_content(file)
@@ -38,7 +40,17 @@ class Classifier:
                 "analysis_method": classification.analysis_method,
                 "details": classification.details,
             }
-            results.append(result)
+            file_details.append(result)
+            summary[classification.zone] = summary.get(classification.zone, 0) + 1
+
+        return AnalysisResult(
+            repo=str(self.analyzer.repo_path),
+            analyzed_at=datetime.now().isoformat(),
+            total_files=len(file_details),
+            summary=summary,
+            zones={}, # Detailed zone-by-zone stats could be added here
+            file_details=file_details
+        )
 
         return results
 
@@ -47,8 +59,8 @@ async def main():
     import json
     if len(sys.argv) > 1:
         classifier = Classifier(sys.argv[1])
-        results = await classifier.classify_all()
-        print(json.dumps(results, indent=2))
+        result = await classifier.classify_all()
+        print(result.model_dump_json(indent=2))
     else:
         print("Usage: python backend/analyzer/classifier.py <path_to_repo>")
 

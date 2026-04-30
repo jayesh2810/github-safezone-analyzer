@@ -10,14 +10,33 @@ function apiBase(): string {
 
 const API_BASE = apiBase();
 
-export async function startAnalysis(repoUrl: string) {
+export async function startAnalysis(repoPath: string) {
     const response = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ repo_url: repoUrl }),
+        body: JSON.stringify({ repo_path: repoPath }),
     });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Analysis failed with status ${response.status}`);
+    }
+    return await response.json();
+}
+
+export async function exportRules(repoPath: string, ideType: string) {
+    const response = await fetch(`${API_BASE}/export-rules`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ repo_path: repoPath, ide_type: ideType }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Export failed with status ${response.status}`);
+    }
     return await response.json();
 }
 
@@ -31,7 +50,3 @@ export async function getAnalysisTree(analysisId: string) {
     return await response.json();
 }
 
-export async function getHealth() {
-    const response = await fetch(`${API_BASE}/health`);
-    return await response.json();
-}

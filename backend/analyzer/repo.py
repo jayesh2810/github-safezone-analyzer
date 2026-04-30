@@ -21,8 +21,9 @@ class RepoAnalyzer:
 
         # Directories to skip
         skip_dirs = {
-            'node_modules', '.git', 'dist', 'build', '.next',
-            '__pycache__', 'venv', '.venv', 'target', 'out'
+            'node_modules', '.git', 'dist', 'build', '.next', '.svelte-kit',
+            '__pycache__', 'venv', '.venv', 'target', 'out', '.nuxt',
+            '.turbo', '.vercel', 'coverage', '.idea', '.vscode'
         }
 
         if not self.repo_path.exists():

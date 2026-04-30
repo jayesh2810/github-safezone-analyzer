@@ -1,104 +1,97 @@
-import shutil
-import sqlite3
-import uuid
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
 from backend.analyzer.classifier import Classifier
-from backend.analyzer.config_generator import ConfigGenerator
-from backend.analyzer.git_remote import clone_github_shallow, looks_like_github_clone_target
-from backend.db.cache import AnalysisCache
+from backend.analyzer.config_generator import ConfigGenerator, IDEType
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-cache = AnalysisCache()
-
-async def run_analysis_task(analysis_id: str, repo_url: str):
-    raw = repo_url.strip()
-    temp_clone: Path | None = None
-    analysis_path = raw
-
-    try:
-        cache.update_status(analysis_id, "in_progress")
-
-        if looks_like_github_clone_target(raw):
-            clone_root, temp_clone = clone_github_shallow(raw)
-            analysis_path = str(clone_root)
-        else:
-            analysis_path = str(Path(raw).resolve())
-
-        classifier = Classifier(analysis_path)
-        results = await classifier.classify_all()
-
-        generator = ConfigGenerator(raw)
-        for res in results:
-            generator.add_file_result(
-                path=res["path"],
-                zone=res["zone"],
-                confidence=res["confidence"],
-                reason=res["reason"],
-                analysis_method=res["analysis_method"],
-                details=res["details"]
-            )
-
-        analysis_data = generator.generate()
-        cache.save_analysis(analysis_id, raw, analysis_data, "completed")
-    except Exception as e:
-        print(f"Error in analysis task: {e}")
-        cache.update_status(analysis_id, "failed")
-    finally:
-        if temp_clone is not None and temp_clone.exists():
-            shutil.rmtree(temp_clone, ignore_errors=True)
+app = FastAPI(title="Safe Zone Analyzer API")
+generator = ConfigGenerator()
 
 class AnalyzeRequest(BaseModel):
-    repo_url: str
+    repo_path: str
 
-class AnalysisResponse(BaseModel):
-    analysis_id: str
+class ExportRequest(BaseModel):
+    repo_path: str
+    ide_type: str
 
-@app.post("/analyze", response_model=AnalysisResponse)
-async def analyze(request: AnalyzeRequest, background_tasks: BackgroundTasks):
-    analysis_id = str(uuid.uuid4())
-    background_tasks.add_task(run_analysis_task, analysis_id, request.repo_url)
-    return {"analysis_id": analysis_id}
+@app.post("/analyze")
+async def analyze_repo(request: AnalyzeRequest):
+    """
+    Analyzes a repository and returns the full AnalysisResult.
+    """
+    try:
+        classifier = Classifier(request.repo_path)
+        result = await classifier.classify_all()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/analyze/{analysis_id}")
-async def get_analysis(analysis_id: str):
-    data = cache.get_analysis(analysis_id)
-    if not data:
-        # Check if it exists but is still in progress
-        with sqlite3.connect(cache.db_path) as conn:
-            cursor = conn.execute("SELECT status FROM results WHERE analysis_id = ?", (analysis_id,))
-            row = cursor.fetchone()
-            if row:
-                return {"status": row[0], "data": None}
-            raise HTTPException(status_code=404, detail="Analysis not found")
-    return {"status": "completed", "data": data}
+@app.post("/export-rules")
+async def export_rules(request: ExportRequest):
+    """
+    Analyzes a repository and writes the IDE-specific rules file directly to the repo root.
+    """
+    try:
+        # Validate IDE type
+        try:
+            ide = IDEType(request.ide_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid ide_type. Supported: {[i.value for i in IDEType]}")
 
-@app.get("/analyze/{analysis_id}/tree")
-async def get_analysis_tree(analysis_id: str):
-    data = cache.get_analysis(analysis_id)
-    if not data:
-        raise HTTPException(status_code=404, detail="Analysis not found")
+        # 1. Analyze the repo
+        classifier = Classifier(request.repo_path)
+        analysis_result = await classifier.classify_all()
+        
+        # 2. Generate the rules content
+        rules_content = generator.generate_rules(analysis_result, ide)
+        
+        # 3. Write the file to the repo root
+        repo_root = Path(request.repo_path).resolve()
+        filename = generator.get_filename(ide)
+        file_path = repo_root / filename
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(rules_content)
+        
+        return {
+            "status": "success",
+            "ide": ide.value,
+            "file_written": str(file_path),
+            "summary": analysis_result.summary
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # In a real implementation, we would transform the file_details into a tree structure.
-    # For now, we return the flat list for the treemap.
-    return data.get("file_details", [])
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+
+@app.post("/export-rules")
+async def export_rules(request: ExportRequest):
+    """
+    Analyzes a repository and returns the IDE-specific rules.
+    """
+    try:
+        # Validate IDE type
+        try:
+            ide = IDEType(request.ide_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid ide_type. Supported: {[i.value for i in IDEType]}")
+
+        # 1. Analyze the repo
+        classifier = Classifier(request.repo_path)
+        analysis_result = await classifier.classify_all()
+        
+        # 2. Generate the rules
+        rules = generator.generate_rules(analysis_result, ide)
+        
+        return {
+            "ide": ide.value,
+            "rules": rules,
+            "summary": analysis_result.summary
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
